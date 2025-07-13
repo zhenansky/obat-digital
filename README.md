@@ -6,6 +6,10 @@
 -   Tailwind
 -   Javascript AJAX
 
+## Assist
+
+Claude AI
+
 ## 🚀 Cara Menjalankan Project Ini
 
 ### 1. **Clone Repository**
