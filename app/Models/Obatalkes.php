@@ -15,7 +15,7 @@ class Obatalkes extends Model
         'is_active',
         'is_deleted',
     ];
-
+    public $timestamps = false;
     public function resepDetails()
     {
         return $this->hasMany(ResepDetail::class, 'obatalkes_id', 'obatalkes_id');

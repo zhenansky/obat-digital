@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ResepController;
+use App\Http\Controllers\RacikanController;
 
 // Route untuk resep - diatur dengan urutan yang tepat
 Route::get('/reseps', [ResepController::class, 'index'])->name('reseps.index');
@@ -20,10 +21,15 @@ Route::post('/reseps/simpan', [ResepController::class, 'simpanDraft'])->name('re
 Route::delete('/reseps/remove-draft/{index}', [ResepController::class, 'removeDraft'])->name('reseps.removeDraft');
 Route::post('/reseps/batal', [ResepController::class, 'batal'])->name('reseps.batal');
 
+// Route detail
+Route::prefix('racikan')->name('racikan.')->group(function () {
+    Route::get('detail/{resepDetailId}', [RacikanController::class, 'getDetail'])->name('detail');
+    Route::post('store/{resepDetailId}', [RacikanController::class, 'storeDetail'])->name('store');
+    Route::get('obat-list', [RacikanController::class, 'getObatList'])->name('obat-list');
+});
+
 // Route untuk CRUD resep - harus di bawah route spesifik
 Route::get('/reseps/{id}', [ResepController::class, 'show'])->name('reseps.show');
-Route::get('/reseps/{id}/edit', [ResepController::class, 'edit'])->name('reseps.edit');
-Route::put('/reseps/{id}', [ResepController::class, 'update'])->name('reseps.update');
 Route::delete('/reseps/{id}', [ResepController::class, 'destroy'])->name('reseps.destroy');
 
 // Route untuk hapus detail resep (AJAX)

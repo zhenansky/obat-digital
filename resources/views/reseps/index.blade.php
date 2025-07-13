@@ -65,10 +65,6 @@
                                             class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition">
                                             <i class="fas fa-eye"></i> Detail
                                         </a>
-                                        <a href="{{ route('reseps.edit', $resep->id) }}"
-                                            class="bg-yellow-500 text-white px-3 py-1 rounded text-xs hover:bg-yellow-600 transition">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </a>
                                         <button type="button" onclick="confirmDelete({{ $resep->id }})"
                                             class="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition">
                                             <i class="fas fa-trash"></i> Hapus

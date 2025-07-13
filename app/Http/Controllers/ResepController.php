@@ -39,123 +39,7 @@ class ResepController extends Controller
         return view('reseps.show', compact('resep'));
     }
 
-    // METHOD BARU: Edit resep
-    public function edit($id)
-    {
-        $resep = Resep::with([
-            'details' => function ($query) {
-                $query->with(['obatalkes', 'signa']);
-            }
-        ])->findOrFail($id);
 
-        $obatalkes = Obatalkes::where('is_deleted', 0)->where('is_active', 1)->get();
-        $signas = Signa::where('is_deleted', 0)->where('is_active', 1)->get();
-
-        return view('reseps.edit', compact('resep', 'obatalkes', 'signas'));
-    }
-
-    // METHOD BARU: Update resep
-    public function update(Request $request, $id)
-    {
-        $request->validate([
-            'nama_pasien' => 'required|string|max:255',
-            'details' => 'required|array|min:1',
-            'details.*.obatalkes_id' => 'nullable|exists:obatalkes_m,obatalkes_id',
-            'details.*.signa_id' => 'required|exists:signa_m,signa_id',
-            'details.*.qty' => 'required|integer|min:1',
-            'details.*.is_racikan' => 'required|boolean',
-            'details.*.nama_racikan' => 'nullable|string|max:255',
-            'details.*.obats' => 'nullable|array',
-            'details.*.obats.*.obatalkes_id' => 'required_if:details.*.is_racikan,true|exists:obatalkes_m,obatalkes_id',
-            'details.*.obats.*.qty' => 'required_if:details.*.is_racikan,true|integer|min:1',
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-            $resep = Resep::findOrFail($id);
-
-            // Kembalikan stok obat dari resep lama
-            foreach ($resep->details as $detail) {
-                if ($detail->is_racikan) {
-                    // Jika ada tabel detail obat racikan, kembalikan stok dari sana
-                    // Untuk sementara, skip karena tidak ada detail obat racikan yang tersimpan
-                } else {
-                    if ($detail->obatalkes_id) {
-                        $obat = Obatalkes::find($detail->obatalkes_id);
-                        if ($obat) {
-                            $obat->stok += $detail->qty;
-                            $obat->save();
-                        }
-                    }
-                }
-            }
-
-            // Hapus detail lama
-            $resep->details()->delete();
-
-            // Update data resep
-            $resep->update([
-                'nama_pasien' => $request->nama_pasien,
-            ]);
-
-            // Simpan detail baru
-            foreach ($request->details as $detail) {
-                if ($detail['is_racikan']) {
-                    // Simpan racikan
-                    ResepDetail::create([
-                        'resep_id' => $resep->id,
-                        'obatalkes_id' => null,
-                        'nama_racikan' => $detail['nama_racikan'],
-                        'is_racikan' => true,
-                        'qty' => 1,
-                        'signa_id' => $detail['signa_id'],
-                    ]);
-
-                    // Kurangi stok obat dalam racikan
-                    if (isset($detail['obats']) && is_array($detail['obats'])) {
-                        foreach ($detail['obats'] as $obat) {
-                            $obatalkes = Obatalkes::find($obat['obatalkes_id']);
-                            if ($obatalkes) {
-                                if ($obatalkes->stok < $obat['qty']) {
-                                    throw new \Exception("Stok obat {$obatalkes->obatalkes_nama} tidak mencukupi.");
-                                }
-                                $obatalkes->stok -= $obat['qty'];
-                                $obatalkes->save();
-                            }
-                        }
-                    }
-                } else {
-                    // Simpan non-racikan
-                    ResepDetail::create([
-                        'resep_id' => $resep->id,
-                        'obatalkes_id' => $detail['obatalkes_id'],
-                        'nama_racikan' => null,
-                        'is_racikan' => false,
-                        'qty' => $detail['qty'],
-                        'signa_id' => $detail['signa_id'],
-                    ]);
-
-                    // Kurangi stok obat
-                    $obat = Obatalkes::find($detail['obatalkes_id']);
-                    if ($obat) {
-                        if ($obat->stok < $detail['qty']) {
-                            throw new \Exception("Stok obat {$obat->obatalkes_nama} tidak mencukupi.");
-                        }
-                        $obat->stok -= $detail['qty'];
-                        $obat->save();
-                    }
-                }
-            }
-
-            DB::commit();
-            return redirect()->route('reseps.show', $resep->id)->with('success', 'Resep berhasil diperbarui.');
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return redirect()->back()->with('error', 'Gagal memperbarui resep: ' . $e->getMessage());
-        }
-    }
 
     // METHOD BARU: Hapus resep
     public function destroy($id)
@@ -464,4 +348,6 @@ class ResepController extends Controller
 
         return redirect()->route('reseps.create')->with('success', 'Racikan berhasil ditambahkan ke draft.');
     }
+
+
 }
