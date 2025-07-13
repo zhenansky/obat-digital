@@ -1,4 +1,4 @@
-# obat-digital
+# Obat Digital
 
 ## 🧾 Tech Stack
 - Laravel 11
