@@ -9,10 +9,10 @@
 ## 🚀 Cara Menjalankan Project Ini
 
 ### 1. **Clone Repository**
-
+```
 git clone https://github.com/username/nama-repo.git
 cd nama-repo
-
+```
 ### 2. **Install Dependencies**
 
 composer install
