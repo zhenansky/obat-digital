@@ -49,6 +49,10 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
+### 5. **Import Master Data**
+
+Buat database mysql, lalu import master data tersebut obatalkes dan signa
+
 ### 5. **Migrasi**
 
 ```
