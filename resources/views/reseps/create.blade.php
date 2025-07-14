@@ -270,17 +270,35 @@
         .searchable-dropdown {
             max-height: 200px;
             overflow-y: auto;
+            z-index: 1000;
         }
 
-        .dropdown-item:hover {
+        .dropdown-item:hover:not(.disabled) {
             background-color: #f3f4f6;
         }
 
-        .dropdown-item.selected {
+        .dropdown-item.selected:not(.disabled) {
             background-color: #3b82f6;
             color: white;
         }
+
+        .dropdown-item.disabled {
+            background-color: #f9fafb;
+            color: #9ca3af;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .dropdown-item.disabled:hover {
+            background-color: #f9fafb;
+            color: #9ca3af;
+        }
+
+        .searchable-select {
+            position: relative;
+        }
     </style>
+
     <script>
         class SearchableSelect {
             constructor(container) {
@@ -295,14 +313,22 @@
             }
 
             init() {
+                // Event listeners
                 this.input.addEventListener('input', (e) => this.handleInput(e));
                 this.input.addEventListener('focus', () => this.showDropdown());
                 this.input.addEventListener('keydown', (e) => this.handleKeydown(e));
+                this.input.addEventListener('click', () => this.showDropdown());
 
+                // Click events for dropdown items
                 this.items.forEach((item, index) => {
-                    item.addEventListener('click', () => this.selectItem(item, index));
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.selectItem(item, index);
+                    });
                 });
 
+                // Close dropdown when clicking outside
                 document.addEventListener('click', (e) => {
                     if (!this.container.contains(e.target)) {
                         this.hideDropdown();
@@ -322,15 +348,16 @@
                     if (isVisible) hasVisibleItems = true;
                 });
 
+                // Reset selection
                 this.selectedIndex = -1;
                 this.updateSelection();
 
-                if (hasVisibleItems) {
+                // Show dropdown jika ada input atau item visible
+                if (hasVisibleItems || query.length > 0) {
                     this.showDropdown();
-                } else {
-                    this.hideDropdown();
                 }
 
+                // Clear hidden input if text doesn't match any item exactly
                 if (!this.findExactMatch(e.target.value)) {
                     this.hiddenInput.value = '';
                 }
@@ -338,7 +365,7 @@
 
             handleKeydown(e) {
                 const visibleItems = Array.from(this.items).filter(item =>
-                    item.style.display !== 'none'
+                    item.style.display !== 'none' && item.dataset.available === 'true'
                 );
 
                 switch (e.key) {
@@ -346,12 +373,14 @@
                         e.preventDefault();
                         this.selectedIndex = Math.min(this.selectedIndex + 1, visibleItems.length - 1);
                         this.updateSelection();
+                        this.showDropdown();
                         break;
 
                     case 'ArrowUp':
                         e.preventDefault();
                         this.selectedIndex = Math.max(this.selectedIndex - 1, -1);
                         this.updateSelection();
+                        this.showDropdown();
                         break;
 
                     case 'Enter':
@@ -369,18 +398,45 @@
             }
 
             updateSelection() {
+                // Remove previous selection
                 this.items.forEach(item => item.classList.remove('selected'));
 
-                const visibleItems = Array.from(this.items).filter(item =>
-                    item.style.display !== 'none'
+                // Add selection to current item (hanya yang available)
+                const visibleAvailableItems = Array.from(this.items).filter(item =>
+                    item.style.display !== 'none' && item.dataset.available === 'true'
                 );
 
-                if (this.selectedIndex >= 0 && visibleItems[this.selectedIndex]) {
-                    visibleItems[this.selectedIndex].classList.add('selected');
+                if (this.selectedIndex >= 0 && visibleAvailableItems[this.selectedIndex]) {
+                    const selectedItem = visibleAvailableItems[this.selectedIndex];
+                    selectedItem.classList.add('selected');
+
+                    // Scroll into view if needed
+                    this.scrollToItem(selectedItem);
+                }
+            }
+
+            scrollToItem(item) {
+                const dropdown = this.dropdown;
+                const itemTop = item.offsetTop;
+                const itemBottom = itemTop + item.offsetHeight;
+                const dropdownTop = dropdown.scrollTop;
+                const dropdownBottom = dropdownTop + dropdown.offsetHeight;
+
+                if (itemTop < dropdownTop) {
+                    dropdown.scrollTop = itemTop;
+                } else if (itemBottom > dropdownBottom) {
+                    dropdown.scrollTop = itemBottom - dropdown.offsetHeight;
                 }
             }
 
             selectItem(item, index) {
+                // Cek apakah item tersedia
+                const isAvailable = item.dataset.available === 'true';
+                if (!isAvailable) {
+                    console.log('Item tidak tersedia (stok habis)');
+                    return; // Tidak bisa dipilih jika stok habis
+                }
+
                 const value = item.dataset.value;
                 const text = item.textContent;
 
@@ -388,19 +444,29 @@
                 this.hiddenInput.value = value;
                 this.hideDropdown();
 
+                // Trigger change event
                 this.hiddenInput.dispatchEvent(new Event('change'));
+
+                // Show selected feedback
+                this.input.classList.add('border-green-500');
+                setTimeout(() => {
+                    this.input.classList.remove('border-green-500');
+                }, 1000);
             }
 
             findExactMatch(text) {
                 return Array.from(this.items).find(item =>
-                    item.textContent === text
+                    item.textContent.trim() === text.trim()
                 );
             }
 
             showDropdown() {
                 this.dropdown.classList.remove('hidden');
+                // Reset visibility untuk semua items
                 this.items.forEach(item => {
-                    item.style.display = 'block';
+                    if (!this.input.value) {
+                        item.style.display = 'block';
+                    }
                 });
             }
 
@@ -411,14 +477,100 @@
             }
         }
 
+
         // Initialize searchable selects
+        // Function untuk initialize semua searchable selects
         function initSearchableSelects() {
+            console.log('Initializing searchable selects...');
             const searchableSelects = document.querySelectorAll('.searchable-select');
-            searchableSelects.forEach(container => {
+            console.log('Found', searchableSelects.length, 'searchable selects');
+
+            searchableSelects.forEach((container, index) => {
+                console.log('Initializing select', index);
                 new SearchableSelect(container);
             });
         }
         // Global functions untuk form racikan
+        window.tambahObatRacikan = function () {
+            console.log('tambahObatRacikan called');
+
+            const template = document.getElementById('template-obat');
+            const container = document.getElementById('racikan-obats');
+
+            if (!template || !container) {
+                console.error('Template or container not found');
+                return;
+            }
+
+            const currentObatCount = document.querySelectorAll('.racikan-item').length;
+            const nextIndex = currentObatCount;
+            const labelNumber = currentObatCount + 1;
+
+            const html = template.innerHTML
+                .replace(/__NAME_OBAT__/g, `obats[${nextIndex}][obatalkes_id]`)
+                .replace(/__NAME_QTY__/g, `obats[${nextIndex}][qty]`)
+                .replace(/__INDEX__/g, nextIndex)
+                .replace(/__LABEL_NUMBER__/g, labelNumber);
+
+            container.insertAdjacentHTML('beforeend', html);
+
+            // Initialize searchable select untuk item baru
+            setTimeout(() => {
+                const newItem = container.lastElementChild;
+                const newSearchableSelect = newItem.querySelector('.searchable-select');
+                if (newSearchableSelect) {
+                    console.log('Initializing new searchable select');
+                    new SearchableSelect(newSearchableSelect);
+                }
+
+                window.updateObatLabelsAndIndexes();
+                window.updateHapusButtons();
+            }, 100);
+
+            // Animate new item
+            const newItemElement = container.lastElementChild;
+            newItemElement.style.opacity = '0';
+            newItemElement.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                newItemElement.style.transition = 'all 0.3s ease';
+                newItemElement.style.opacity = '1';
+                newItemElement.style.transform = 'translateY(0)';
+            }, 10);
+        };
+
+        window.updateHapusButtons = function () {
+            const items = document.querySelectorAll('.racikan-item');
+            const hapusButtons = document.querySelectorAll('.hapus-btn');
+
+            hapusButtons.forEach(button => {
+                button.style.display = items.length > 1 ? 'inline-block' : 'none';
+            });
+        };
+
+        window.updateObatLabelsAndIndexes = function () {
+            const items = document.querySelectorAll('.racikan-item');
+            items.forEach((item, index) => {
+                const label = item.querySelector('label.font-medium');
+                if (label) {
+                    label.textContent = `Obat #${index + 1}`;
+                }
+
+                const selectObat = item.querySelector('input[type="hidden"][name*="obatalkes_id"]');
+                const inputQty = item.querySelector('input[name*="qty"]');
+
+                if (selectObat) selectObat.name = `obats[${index}][obatalkes_id]`;
+                if (inputQty) inputQty.name = `obats[${index}][qty]`;
+
+                item.setAttribute('data-index', index);
+
+                const hapusButton = item.querySelector('button[onclick*="hapusObat"]');
+                if (hapusButton) {
+                    hapusButton.setAttribute('onclick', `hapusObat(${index})`);
+                }
+            });
+        };
+
+        // Global functions untuk form racikan - PINDAHKAN DARI FORM KE SINI
         window.tambahObat = function () {
             console.log('tambahObat called');
 
@@ -442,17 +594,25 @@
 
             container.insertAdjacentHTML('beforeend', html);
 
-            window.updateObatLabelsAndIndexes();
-            window.updateHapusButtons();
+            setTimeout(() => {
+                const newItem = container.lastElementChild;
+                const newSearchableSelect = newItem.querySelector('.searchable-select');
+                if (newSearchableSelect) {
+                    new SearchableSelect(newSearchableSelect);
+                }
+
+                window.updateObatLabelsAndIndexes();
+                window.updateHapusButtons();
+            }, 100);
 
             // Animate new item
-            const newItem = container.lastElementChild;
-            newItem.style.opacity = '0';
-            newItem.style.transform = 'translateY(20px)';
+            const newItemElement = container.lastElementChild;
+            newItemElement.style.opacity = '0';
+            newItemElement.style.transform = 'translateY(20px)';
             setTimeout(() => {
-                newItem.style.transition = 'all 0.3s ease';
-                newItem.style.opacity = '1';
-                newItem.style.transform = 'translateY(0)';
+                newItemElement.style.transition = 'all 0.3s ease';
+                newItemElement.style.opacity = '1';
+                newItemElement.style.transform = 'translateY(0)';
             }, 10);
         };
 
@@ -478,43 +638,15 @@
             }
         };
 
-        window.updateHapusButtons = function () {
-            const items = document.querySelectorAll('.racikan-item');
-            const hapusButtons = document.querySelectorAll('.racikan-item button[onclick*="hapusObat"]');
-
-            hapusButtons.forEach(button => {
-                button.style.display = items.length > 1 ? 'inline-flex' : 'none';
-            });
-        };
-
-        window.updateObatLabelsAndIndexes = function () {
-            const items = document.querySelectorAll('.racikan-item');
-            items.forEach((item, index) => {
-                const label = item.querySelector('label.font-medium');
-                if (label) {
-                    label.textContent = `Obat #${index + 1}`;
-                }
-
-                const selectObat = item.querySelector('select[name*="obatalkes_id"]');
-                const inputQty = item.querySelector('input[name*="qty"]');
-
-                if (selectObat) selectObat.name = `obats[${index}][obatalkes_id]`;
-                if (inputQty) inputQty.name = `obats[${index}][qty]`;
-
-                item.setAttribute('data-index', index);
-
-                const hapusButton = item.querySelector('button[onclick*="hapusObat"]');
-                if (hapusButton) {
-                    hapusButton.setAttribute('onclick', `hapusObat(${index})`);
-                }
-            });
-        };
-
         window.initRacikanForm = function () {
             console.log('Initializing racikan form');
-            window.updateObatLabelsAndIndexes();
-            window.updateHapusButtons();
+            setTimeout(() => {
+                initSearchableSelects();
+                window.updateObatLabelsAndIndexes();
+                window.updateHapusButtons();
+            }, 200);
         };
+
 
         // Notification system
         function showNotification(message, type = 'info') {
@@ -525,15 +657,15 @@
                 }`;
 
             notification.innerHTML = `
-                            <div class="flex items-center">
-                                <span class="flex-1">${message}</span>
-                                <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-gray-500 hover:text-gray-700">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        `;
+                    <div class="flex items-center">
+                        <span class="flex-1">${message}</span>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-gray-500 hover:text-gray-700">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                `;
 
             document.body.appendChild(notification);
 
@@ -546,6 +678,7 @@
                 setTimeout(() => notification.remove(), 300);
             }, 3000);
         }
+
 
         // Enhanced form loading
         function loadForm(url, buttonEl) {
@@ -576,24 +709,25 @@
 
                     // Initialize searchable selects untuk form yang baru dimuat
                     setTimeout(() => {
+                        console.log('Initializing searchable selects after form load');
                         initSearchableSelects();
                         if (url.includes('racikan')) {
                             window.initRacikanForm();
                         }
-                    }, 100);
+                    }, 200);
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     container.innerHTML = `
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            <span class="text-red-800">Error loading form. Please try again.</span>
-                        </div>
-                    </div>
-                `;
+                                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <div class="flex items-center">
+                                        <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span class="text-red-800">Error loading form. Please try again.</span>
+                                    </div>
+                                </div>
+                            `;
                     container.style.display = 'block';
                     loadingState.classList.add('hidden');
                 })
@@ -602,7 +736,6 @@
                     buttonEl.querySelector('svg').classList.remove('animate-spin');
                 });
         }
-
         document.addEventListener('DOMContentLoaded', function () {
             const container = document.getElementById('form-container');
             const btnNonRacikan = document.getElementById('btn-nonracikan');
@@ -660,12 +793,12 @@
                 const submitBtn = this.querySelector('button[type="submit"]');
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = `
-                                <svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Menyimpan...
-                            `;
+                                                                                            <svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                                            </svg>
+                                                                                            Menyimpan...
+                                                                                        `;
             });
 
             // Auto-save draft functionality (optional)
@@ -895,30 +1028,30 @@
             const printContent = document.getElementById('resep-summary').innerHTML;
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
-                            <html>
-                                <head>
-                                    <title>Resep Obat</title>
-                                    <style>
-                                        body { font-family: Arial, sans-serif; margin: 20px; }
-                                        .header { text-align: center; margin-bottom: 30px; }
-                                        .content { margin-bottom: 20px; }
-                                        table { width: 100%; border-collapse: collapse; }
-                                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                                        th { background-color: #f2f2f2; }
-                                        @media print { .no-print { display: none; } }
-                                    </style>
-                                </head>
-                                <body>
-                                    <div class="header">
-                                        <h1>RESEP OBAT</h1>
-                                        <p>Tanggal: ${new Date().toLocaleDateString('id-ID')}</p>
-                                    </div>
-                                    <div class="content">
-                                        ${printContent}
-                                    </div>
-                                </body>
-                            </html>
-                        `);
+                                                                                        <html>
+                                                                                            <head>
+                                                                                                <title>Resep Obat</title>
+                                                                                                <style>
+                                                                                                    body { font-family: Arial, sans-serif; margin: 20px; }
+                                                                                                    .header { text-align: center; margin-bottom: 30px; }
+                                                                                                    .content { margin-bottom: 20px; }
+                                                                                                    table { width: 100%; border-collapse: collapse; }
+                                                                                                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                                                                                    th { background-color: #f2f2f2; }
+                                                                                                    @media print { .no-print { display: none; } }
+                                                                                                </style>
+                                                                                            </head>
+                                                                                            <body>
+                                                                                                <div class="header">
+                                                                                                    <h1>RESEP OBAT</h1>
+                                                                                                    <p>Tanggal: ${new Date().toLocaleDateString('id-ID')}</p>
+                                                                                                </div>
+                                                                                                <div class="content">
+                                                                                                    ${printContent}
+                                                                                                </div>
+                                                                                            </body>
+                                                                                        </html>
+                                                                                    `);
             printWindow.document.close();
             printWindow.print();
         }
