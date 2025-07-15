@@ -4,6 +4,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ResepController;
 use App\Http\Controllers\RacikanController;
 
+Route::get('/', function () {
+    return redirect()->route('reseps.index');
+});
+
 // Route untuk resep - diatur dengan urutan yang tepat
 Route::get('/reseps', [ResepController::class, 'index'])->name('reseps.index');
 Route::get('/reseps/create', [ResepController::class, 'create'])->name('reseps.create');
